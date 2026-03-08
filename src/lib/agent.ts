@@ -20,21 +20,21 @@ function buildDeterministicTweet(input: string): string {
     .replace(/[\r\n]+/g, ' ')
     .trim();
 
-  const maxBodyLength = 235;
+  const maxBodyLength = 225;
   const body = cleaned.length > maxBodyLength
     ? `${cleaned.slice(0, maxBodyLength - 1).trim()}…`
     : cleaned;
 
-  return `${body} #AI`;
+  return `${body} #AI #MachineLearning`;
 }
 
 function buildDeterministicTweetOptions(topic: string): string[] {
-  const base = buildDeterministicTweet(topic).replace(/\s+#AI$/, '');
+  const base = buildDeterministicTweet(topic).replace(/\s+#AI\s+#MachineLearning$/, '');
   return [
-    `${base} #AI`,
-    `Key update: ${base} #MachineLearning`,
-    `${base} What are your thoughts on the impact? #AI`,
-    `${base} This could reshape how teams ship AI products. #GenAI`,
+    `What if ${base}? This could transform AI development. #AI #MachineLearning`,
+    `Breaking: ${base}. Major implications for the industry. #GenAI #AIResearch`,
+    `${base} — the future of intelligent systems is evolving fast. #DeepLearning #AI`,
+    `Key insight: ${base}. How will this impact your AI workflow? #TechInnovation #MachineLearning`,
   ].map(option => option.slice(0, 280));
 }
 
@@ -120,17 +120,18 @@ async function generateWithGroq(prompt: string): Promise<{ text: string; model: 
 }
 
 export async function generateTweet(context: string): Promise<string> {
-  const prompt = `You are a top-tier AI researcher and expert communicator. Based on the given context, synthesize a concise, factual, and engaging tweet (280 characters max). 
-
-The tweet should:
-- Be professional and insightful
-- Highlight the key innovation or breakthrough
-- Use minimal hashtags (max 1-2) and no emojis
-- Be suitable for an AI/tech-focused audience
+  const prompt = `You are an expert AI researcher and technology thought leader. Create a compelling, research-focused tweet (max 280 characters) based on this context.
 
 Context: ${context}
 
-Generate only the tweet text, with no additional explanation.`;
+Requirements:
+- Lead with the key insight or breakthrough
+- Use clear, accessible language for tech professionals
+- Include 2-3 relevant hashtags (e.g., #AI, #MachineLearning, #GenAI, #DeepLearning, #AIResearch, #TechInnovation)
+- Professional tone, no emojis
+- Focus on impact and implications
+
+Return only the tweet text.`;
 
   try {
     const { text } = await generateWithGroq(prompt);
@@ -145,16 +146,24 @@ Generate only the tweet text, with no additional explanation.`;
 }
 
 export async function generateTweetOptions(topic: string, count = 4): Promise<string[]> {
-  const prompt = `Generate ${count} different tweet options about this topic.
+  const prompt = `You are an AI research expert creating social media content. Generate ${count} distinct, engaging tweet variations about this topic.
 
 Topic: ${topic}
 
-Rules:
-- Each tweet must be under 280 characters
+Create ${count} different approaches:
+1. A thought-provoking question that sparks discussion
+2. A bold statement highlighting the key innovation
+3. A practical insight showing real-world impact
+4. A future-focused perspective on implications
+
+Requirements for EACH tweet:
+- Maximum 280 characters
+- Include 2-3 relevant hashtags (choose from: #AI, #MachineLearning, #GenAI, #DeepLearning, #AIResearch, #TechInnovation, #DataScience, #NeuralNetworks)
 - Professional, insightful tone
-- Max 1-2 hashtags per tweet
-- No emojis
-- Return plain text only, one tweet per line, no numbering`;
+- No emojis, no numbering
+- Each tweet must stand alone and be compelling
+
+Return only the ${count} tweet texts, one per line, no extra formatting.`;
 
   try {
     const { text } = await generateWithGroq(prompt);
@@ -183,7 +192,7 @@ export async function selectBestHeadline(headlines: string[]): Promise<{ index: 
     .map((h, i) => `${i + 1}. ${h}`)
     .join('\n');
 
-  const prompt = `You are a top-tier AI researcher evaluating recent AI breakthroughs. Analyze the following headlines and select the single most impactful breakthrough. Then synthesize it into a compelling, factual tweet (280 characters max).
+  const prompt = `You are an AI research expert curating breakthrough news. Analyze these headlines and select the most significant innovation. Create a compelling tweet about it.
 
 Headlines:
 ${headlinesList}
@@ -192,11 +201,12 @@ Respond in this exact format:
 SELECTED: <number>
 TWEET: <the tweet text>
 
-Requirements:
-- Be professional and insightful
-- Highlight the key innovation
-- Use minimal hashtags (max 1-2) and no emojis
-- Be suitable for an AI/tech audience`;
+Tweet Requirements:
+- Maximum 280 characters
+- Lead with the key breakthrough or insight
+- Include 2-3 relevant hashtags (#AI, #MachineLearning, #GenAI, #AIResearch, etc.)
+- Professional tone, no emojis
+- Focus on why this matters to the AI community`;
 
   let text: string;
   try {
