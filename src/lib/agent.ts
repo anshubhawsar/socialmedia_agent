@@ -6,9 +6,41 @@ if (!process.env.GEMINI_API_KEY) {
 
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-export async function generateTweet(context: string): Promise<string> {
-  const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
+const DEFAULT_GEMINI_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-flash',
+  'gemini-pro',
+];
 
+function getModelCandidates(): string[] {
+  const configured = process.env.GEMINI_MODEL?.trim();
+  if (!configured) return DEFAULT_GEMINI_MODELS;
+
+  // Try user-configured model first, then fall back to known compatible models.
+  return [configured, ...DEFAULT_GEMINI_MODELS.filter(m => m !== configured)];
+}
+
+async function generateWithFallback(prompt: string): Promise<{ text: string; model: string }> {
+  const models = getModelCandidates();
+  const errors: string[] = [];
+
+  for (const modelName of models) {
+    try {
+      const model = gemini.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      return { text: result.response.text().trim(), model: modelName };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${modelName}: ${message}`);
+    }
+  }
+
+  throw new Error(`All Gemini models failed. Tried: ${errors.join(' | ')}`);
+}
+
+export async function generateTweet(context: string): Promise<string> {
   const prompt = `You are a top-tier AI researcher and expert communicator. Based on the given context, synthesize a concise, factual, and engaging tweet (280 characters max). 
 
 The tweet should:
@@ -21,14 +53,11 @@ Context: ${context}
 
 Generate only the tweet text, with no additional explanation.`;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
+  const { text } = await generateWithFallback(prompt);
   return text.trim();
 }
 
 export async function selectBestHeadline(headlines: string[]): Promise<{ index: number; synthesis: string }> {
-  const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
-
   const headlinesList = headlines
     .map((h, i) => `${i + 1}. ${h}`)
     .join('\n');
@@ -48,8 +77,7 @@ Requirements:
 - Use minimal hashtags (max 1-2) and no emojis
 - Be suitable for an AI/tech audience`;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
+  const { text } = await generateWithFallback(prompt);
 
   const lines = text.split('\n');
   const selectedLine = lines.find(line => line.startsWith('SELECTED:'));
