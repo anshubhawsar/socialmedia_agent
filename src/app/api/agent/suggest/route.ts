@@ -19,8 +19,21 @@ export async function POST(request: NextRequest) {
     const options = await generateTweetOptions(topic, 4);
     return NextResponse.json({ success: true, topic, options });
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const normalized = message.toLowerCase();
+
+    if (normalized.includes('quota') || normalized.includes('429')) {
+      return NextResponse.json(
+        {
+          error: 'Gemini quota exceeded. Enable billing or use a key/project with available quota, then retry.',
+          details: message,
+        },
+        { status: 429 }
+      );
+    }
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
+      { error: message },
       { status: 500 }
     );
   }

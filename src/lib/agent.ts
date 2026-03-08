@@ -9,10 +9,16 @@ const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const DEFAULT_GEMINI_MODELS = [
   'gemini-2.0-flash',
   'gemini-2.0-flash-lite',
+  'gemini-1.5-flash-8b',
   'gemini-1.5-flash-latest',
   'gemini-1.5-flash',
+  'gemini-1.5-pro-latest',
+  'gemini-1.5-pro',
+  'gemini-1.0-pro',
   'gemini-pro',
 ];
+
+const ENABLE_NON_AI_FALLBACK = process.env.ENABLE_NON_AI_FALLBACK === 'true';
 
 function buildDeterministicTweet(input: string): string {
   const cleaned = input
@@ -51,21 +57,53 @@ function getModelCandidates(): string[] {
 }
 
 async function generateWithFallback(prompt: string): Promise<{ text: string; model: string }> {
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const parseRetryDelayMs = (message: string): number => {
+    const secMatch = message.match(/Please retry in\s+([\d.]+)s/i);
+    if (!secMatch) return 0;
+    const seconds = Number(secMatch[1]);
+    return Number.isFinite(seconds) ? Math.max(0, Math.ceil(seconds * 1000)) : 0;
+  };
+
+  const isRetryableQuotaError = (message: string): boolean => {
+    const normalized = message.toLowerCase();
+    return normalized.includes('429')
+      || normalized.includes('quota exceeded')
+      || normalized.includes('resource_exhausted')
+      || normalized.includes('too many requests');
+  };
+
   const models = getModelCandidates();
   const errors: string[] = [];
 
   for (const modelName of models) {
-    try {
-      const model = gemini.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      return { text: result.response.text().trim(), model: modelName };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`${modelName}: ${message}`);
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const model = gemini.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        return { text: result.response.text().trim(), model: modelName };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const retryDelayMs = parseRetryDelayMs(message);
+        const retryable = isRetryableQuotaError(message) && attempt < 2;
+
+        if (retryable) {
+          await sleep(retryDelayMs || 1200);
+          continue;
+        }
+
+        errors.push(`${modelName}: ${message}`);
+        break;
+      }
     }
   }
 
-  throw new Error(`All Gemini models failed. Tried: ${errors.join(' | ')}`);
+  throw new Error(
+    `Gemini generation failed for all candidate models. ${
+      errors.length ? `Details: ${errors.join(' | ')}` : ''
+    }`
+  );
 }
 
 export async function generateTweet(context: string): Promise<string> {
@@ -84,7 +122,10 @@ Generate only the tweet text, with no additional explanation.`;
   try {
     const { text } = await generateWithFallback(prompt);
     return text.trim();
-  } catch {
+  } catch (error) {
+    if (!ENABLE_NON_AI_FALLBACK) {
+      throw error;
+    }
     // Graceful degradation for quota/model outages.
     return buildDeterministicTweet(context);
   }
@@ -114,7 +155,10 @@ Rules:
     if (unique.length > 0) {
       return unique.slice(0, count);
     }
-  } catch {
+  } catch (error) {
+    if (!ENABLE_NON_AI_FALLBACK) {
+      throw error;
+    }
     // Fall through to deterministic options when AI is unavailable.
   }
 
@@ -144,7 +188,10 @@ Requirements:
   let text: string;
   try {
     ({ text } = await generateWithFallback(prompt));
-  } catch {
+  } catch (error) {
+    if (!ENABLE_NON_AI_FALLBACK) {
+      throw error;
+    }
     const fallbackIndex = 0;
     return {
       index: fallbackIndex,
