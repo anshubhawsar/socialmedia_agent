@@ -18,6 +18,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!supabase) {
+    return NextResponse.json(
+      { success: true, message: 'Supabase not configured. Auto-mode requires database setup.' }
+    );
+  }
+
   try {
     const headlines = await fetchLatestHeadlines(5);
 

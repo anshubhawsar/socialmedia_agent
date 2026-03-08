@@ -3,8 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase credentials');
-}
+const hasValidSupabase = 
+  supabaseUrl && 
+  supabaseServiceKey && 
+  !supabaseUrl.includes('your-project') && 
+  !supabaseServiceKey.includes('your-service');
 
-export const supabase = createClient(supabaseUrl, supabaseServiceKey);
+export const supabase = hasValidSupabase 
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
+
+export const isSupabaseConfigured = () => supabase !== null;

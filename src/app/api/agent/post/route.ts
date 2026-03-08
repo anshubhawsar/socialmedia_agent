@@ -18,34 +18,52 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    let accessToken: string;
+    
+    if (!supabase) {
+      // Cookie-based session
+      const cookieToken = request.cookies.get('access_token')?.value;
+      if (!cookieToken) {
+        return NextResponse.json(
+          { error: 'Not authenticated' },
+          { status: 401 }
+        );
+      }
+      accessToken = cookieToken;
+    } else {
+      // Database session
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      if (userError || !user) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        );
+      }
+
+      accessToken = await ensureValidAccessToken(user);
     }
 
     const tweet = await generateTweet(context);
-    const validAccessToken = await ensureValidAccessToken(user);
-    const tweetId = await postTweet(validAccessToken, tweet);
+    const tweetId = await postTweet(accessToken, tweet);
 
-    const { error: logError } = await supabase
-      .from('tweets')
-      .insert({
-        user_id: userId,
-        tweet_id: tweetId,
-        content: tweet,
-        is_auto: false,
-      });
+    if (supabase) {
+      const { error: logError } = await supabase
+        .from('tweets')
+        .insert({
+          user_id: userId,
+          tweet_id: tweetId,
+          content: tweet,
+          is_auto: false,
+        });
 
-    if (logError) {
-      console.warn('Failed to log tweet:', logError);
+      if (logError) {
+        console.warn('Failed to log tweet:', logError);
+      }
     }
 
     return NextResponse.json(

@@ -12,6 +12,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (!supabase) {
+      // Cookie-based session (no database)
+      const username = request.cookies.get('username')?.value || 'User';
+      const twitterId = request.cookies.get('twitter_id')?.value;
+      return NextResponse.json({
+        id: userId,
+        username,
+        twitter_id: twitterId,
+        auto_mode: false, // Not supported without database
+        created_at: new Date().toISOString(),
+      });
+    }
+
     const { data: user, error } = await supabase
       .from('users')
       .select('id, username, auto_mode, created_at')
@@ -44,6 +57,13 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json(
       { error: 'Missing userId' },
       { status: 400 }
+    );
+  }
+
+  if (!supabase) {
+    return NextResponse.json(
+      { error: 'Database not configured. Auto-mode requires Supabase setup.' },
+      { status: 501 }
     );
   }
 

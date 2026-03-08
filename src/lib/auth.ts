@@ -156,18 +156,20 @@ export async function ensureValidAccessToken(user: User): Promise<string> {
   const tokenResponse = await refreshAccessToken(user.refresh_token);
   const expiresAt = Math.floor(Date.now() / 1000) + tokenResponse.expires_in;
 
-  const { error } = await supabase
-    .from('users')
-    .update({
-      access_token: tokenResponse.access_token,
-      refresh_token: tokenResponse.refresh_token || user.refresh_token,
-      expires_at: expiresAt,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', user.id);
+  if (supabase) {
+    const { error } = await supabase
+      .from('users')
+      .update({
+        access_token: tokenResponse.access_token,
+        refresh_token: tokenResponse.refresh_token || user.refresh_token,
+        expires_at: expiresAt,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id);
 
-  if (error) {
-    throw new Error(`Failed to update tokens: ${error.message}`);
+    if (error) {
+      throw new Error(`Failed to update tokens: ${error.message}`);
+    }
   }
 
   return tokenResponse.access_token;
