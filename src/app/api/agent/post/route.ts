@@ -7,12 +7,13 @@ import { TweetRequest } from '@/types';
 
 export async function POST(request: NextRequest) {
   const body: TweetRequest = await request.json();
-  const { context } = body;
+  const context = typeof body.context === 'string' ? body.context.trim() : '';
+  const selectedTweet = typeof body.tweet === 'string' ? body.tweet.trim() : '';
   const userId = request.headers.get('x-user-id');
 
-  if (!userId || !context) {
+  if (!userId || (!context && !selectedTweet)) {
     return NextResponse.json(
-      { error: 'Missing userId or context' },
+      { error: 'Missing userId or tweet input' },
       { status: 400 }
     );
   }
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       accessToken = await ensureValidAccessToken(user);
     }
 
-    const tweet = await generateTweet(context);
+    const tweet = selectedTweet || await generateTweet(context);
 
     let tweetId: string | null = null;
     try {

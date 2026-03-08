@@ -45,7 +45,9 @@ export interface RSSItem {
 }
 
 export interface TweetRequest {
-  context: string;
+  context?: string;
+  topic?: string;
+  tweet?: string;
 }
 
 export interface GeminiResponse {

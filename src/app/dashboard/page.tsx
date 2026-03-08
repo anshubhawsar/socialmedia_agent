@@ -14,6 +14,9 @@ export default function Dashboard() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [context, setContext] = useState('');
+  const [options, setOptions] = useState<string[]>([]);
+  const [selectedOption, setSelectedOption] = useState('');
+  const [generating, setGenerating] = useState(false);
   const [posting, setPosting] = useState(false);
   const [autoMode, setAutoMode] = useState(false);
   const [message, setMessage] = useState('');
@@ -43,8 +46,11 @@ export default function Dashboard() {
   };
 
   const handlePostTweet = async () => {
-    if (!context.trim()) {
-      setMessage('Please enter a context');
+    const topic = context.trim();
+    const chosenTweet = selectedOption.trim();
+
+    if (!topic && !chosenTweet) {
+      setMessage('Please enter a topic and generate options first');
       return;
     }
 
@@ -57,7 +63,7 @@ export default function Dashboard() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ context }),
+        body: JSON.stringify({ context: topic, tweet: chosenTweet || undefined }),
       });
 
       const data = await response.json();
@@ -78,10 +84,48 @@ export default function Dashboard() {
         setMessage(`Tweet posted! ${data.tweet}`);
       }
       setContext('');
+      setOptions([]);
+      setSelectedOption('');
     } catch (error) {
       setMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setPosting(false);
+    }
+  };
+
+  const handleGenerateOptions = async () => {
+    const topic = context.trim();
+    if (!topic) {
+      setMessage('Please enter a topic first');
+      return;
+    }
+
+    setGenerating(true);
+    setMessage('');
+    setIntentUrl(null);
+
+    try {
+      const response = await fetch('/api/agent/suggest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ topic }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate tweet options');
+      }
+
+      const nextOptions: string[] = Array.isArray(data.options) ? data.options : [];
+      setOptions(nextOptions);
+      setSelectedOption(nextOptions[0] || '');
+      setMessage(`Generated ${nextOptions.length} tweet options. Select one and click post.`);
+    } catch (error) {
+      setMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -157,21 +201,57 @@ export default function Dashboard() {
           <div className="md:col-span-2 space-y-6">
             <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-lg">
               <h2 className="text-xl font-bold text-white mb-4">
-                Manual Post
+                Topic To Tweet Options
               </h2>
               <textarea
                 value={context}
                 onChange={(e) => setContext(e.target.value)}
-                placeholder="Enter context for AI to generate tweet..."
+                placeholder="Enter a topic (e.g. AI agents for customer support)"
                 className="w-full h-32 p-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
-              <button
-                onClick={handlePostTweet}
-                disabled={posting}
-                className="mt-4 w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
-              >
-                {posting ? 'Posting...' : 'Generate & Post Tweet'}
-              </button>
+
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  onClick={handleGenerateOptions}
+                  disabled={generating || posting}
+                  className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  {generating ? 'Generating...' : 'Generate Tweet Options'}
+                </button>
+                <button
+                  onClick={handlePostTweet}
+                  disabled={posting || generating || !selectedOption}
+                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  {posting ? 'Posting...' : 'Post Selected Tweet'}
+                </button>
+              </div>
+
+              {options.length > 0 && (
+                <div className="mt-6 space-y-3">
+                  {options.map((option, idx) => (
+                    <label
+                      key={`${idx}-${option.slice(0, 20)}`}
+                      className={`block p-3 rounded-lg border cursor-pointer transition-colors ${
+                        selectedOption === option
+                          ? 'border-blue-500 bg-slate-700'
+                          : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="radio"
+                          name="tweet-option"
+                          checked={selectedOption === option}
+                          onChange={() => setSelectedOption(option)}
+                          className="mt-1"
+                        />
+                        <span className="text-slate-200 text-sm">{option}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             {message && (

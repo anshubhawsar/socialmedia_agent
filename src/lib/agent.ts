@@ -28,6 +28,20 @@ function buildDeterministicTweet(input: string): string {
   return `${body} #AI`;
 }
 
+function buildDeterministicTweetOptions(topic: string): string[] {
+  const base = buildDeterministicTweet(topic).replace(/\s+#AI$/, '');
+  return [
+    `${base} #AI`,
+    `Key update: ${base} #MachineLearning`,
+    `${base} What are your thoughts on the impact? #AI`,
+    `${base} This could reshape how teams ship AI products. #GenAI`,
+  ].map(option => option.slice(0, 280));
+}
+
+function normalizeTweetOption(option: string): string {
+  return option.replace(/^[-*\d.)\s]+/, '').replace(/^"|"$/g, '').trim();
+}
+
 function getModelCandidates(): string[] {
   const configured = process.env.GEMINI_MODEL?.trim();
   if (!configured) return DEFAULT_GEMINI_MODELS;
@@ -74,6 +88,37 @@ Generate only the tweet text, with no additional explanation.`;
     // Graceful degradation for quota/model outages.
     return buildDeterministicTweet(context);
   }
+}
+
+export async function generateTweetOptions(topic: string, count = 4): Promise<string[]> {
+  const prompt = `Generate ${count} different tweet options about this topic.
+
+Topic: ${topic}
+
+Rules:
+- Each tweet must be under 280 characters
+- Professional, insightful tone
+- Max 1-2 hashtags per tweet
+- No emojis
+- Return plain text only, one tweet per line, no numbering`;
+
+  try {
+    const { text } = await generateWithFallback(prompt);
+    const lines = text
+      .split('\n')
+      .map(normalizeTweetOption)
+      .filter(Boolean)
+      .filter(line => line.length <= 280);
+
+    const unique = Array.from(new Set(lines));
+    if (unique.length > 0) {
+      return unique.slice(0, count);
+    }
+  } catch {
+    // Fall through to deterministic options when AI is unavailable.
+  }
+
+  return buildDeterministicTweetOptions(topic).slice(0, count);
 }
 
 export async function selectBestHeadline(headlines: string[]): Promise<{ index: number; synthesis: string }> {
