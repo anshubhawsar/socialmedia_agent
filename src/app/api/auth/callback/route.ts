@@ -80,8 +80,9 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error('Auth error:', error);
+    const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
     return NextResponse.redirect(
-      new URL(`/?error=${encodeURIComponent(String(error))}`, request.nextUrl.origin)
+      new URL(`/?error=${encodeURIComponent(errorMessage)}`, request.nextUrl.origin)
     );
   }
 }
