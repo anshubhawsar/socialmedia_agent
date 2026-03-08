@@ -5,8 +5,9 @@ export async function POST(request: NextRequest) {
   try {
     // Check if Razorpay is configured
     if (!isRazorpayConfigured()) {
+      console.error("Razorpay not configured");
       return NextResponse.json(
-        { error: "Payment gateway not configured" },
+        { error: "Payment gateway not configured. Please contact support." },
         { status: 503 }
       );
     }
@@ -14,8 +15,13 @@ export async function POST(request: NextRequest) {
     // Verify user is logged in (set by middleware)
     const userId = request.headers.get('x-user-id');
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      console.error("No userId in request headers");
+      return NextResponse.json({ 
+        error: "Please login to upgrade your account" 
+      }, { status: 401 });
     }
+
+    console.log("Creating Razorpay order for user:", userId);
 
     // Create Razorpay order
     const razorpay = getRazorpayInstance();
@@ -29,6 +35,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    console.log("Razorpay order created:", order.id);
+
     return NextResponse.json({
       orderId: order.id,
       amount: order.amount,
@@ -37,8 +45,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error creating Razorpay order:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Failed to create payment order" },
+      { 
+        error: "Failed to create payment order", 
+        details: errorMessage 
+      },
       { status: 500 }
     );
   }
