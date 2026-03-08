@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Send, LogOut, Zap, Lock, CheckCircle2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Sparkles, Send, LogOut, Zap } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { PricingSection } from '@/components/pricing-section';
 import { AnimatedButton } from '@/components/animated-button';
@@ -322,12 +322,15 @@ export default function Dashboard() {
             <span className="text-slate-300">
               @{user.username}
             </span>
-            <button
+            <AnimatedButton
               onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+              variant="ghost"
+              size="sm"
+              icon={<LogOut className="h-4 w-4" />}
+              className="border-red-500/40 text-red-300 hover:bg-red-500/10 hover:border-red-400"
             >
               Logout
-            </button>
+            </AnimatedButton>
           </div>
         </div>
       </nav>
@@ -335,9 +338,14 @@ export default function Dashboard() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
-            <div className="relative bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-lg overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+              className="relative bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-lg overflow-hidden"
+            >
               <h2 className="text-xl font-bold text-white mb-4">
-                Topic To Tweet Options
+                Topic to Post Options
               </h2>
               <textarea
                 value={context}
@@ -347,23 +355,43 @@ export default function Dashboard() {
               />
 
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                <button
+                <AnimatedButton
                   onClick={handleGenerateOptions}
+                  type="button"
                   disabled={generating || posting}
-                  className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                  loading={generating}
+                  icon={<Sparkles className="h-4 w-4" />}
+                  className="w-full"
                 >
-                  {generating ? 'Generating...' : 'Generate Post Options'}
-                </button>
-                <button
+                  Generate Post Options
+                </AnimatedButton>
+                <AnimatedButton
                   onClick={handlePostTweet}
+                  type="button"
                   disabled={posting || generating || !selectedOption}
-                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                  loading={posting}
+                  icon={<Send className="h-4 w-4" />}
+                  variant="secondary"
+                  className="w-full"
                 >
-                  {posting ? 'Publishing...' : 'Publish Selected Option'}
-                </button>
+                  Publish Selected Option
+                </AnimatedButton>
               </div>
 
-              {options.length > 0 && (
+              {generating && (
+                <div className="mt-4 space-y-3">
+                  <LoadingMessage
+                    messages={[
+                      'Analyzing topic intent...',
+                      'Composing professional options...',
+                      'Finalizing tone and structure...'
+                    ]}
+                  />
+                  <TweetSkeleton />
+                </div>
+              )}
+
+              {!generating && options.length > 0 && (
                 <div className="mt-6 space-y-3">
                   {options.map((option, idx) => (
                     <label
@@ -395,17 +423,19 @@ export default function Dashboard() {
                   <p className="text-slate-300 mt-2 max-w-md">
                     You used all 10 free tokens. Upgrade to Pro to unlock unlimited tweet generation and posting.
                   </p>
-                  <button
+                  <AnimatedButton
                     type="button"
                     onClick={handleUpgrade}
                     disabled={upgrading || !!user?.is_subscribed}
-                    className="mt-4 px-5 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 disabled:bg-slate-600 text-white font-semibold"
+                    loading={upgrading}
+                    icon={<Zap className="h-4 w-4" />}
+                    className="mt-4"
                   >
                     {upgrading ? 'Upgrading...' : user?.is_subscribed ? 'Pro Active' : 'Upgrade to Pro'}
-                  </button>
+                  </AnimatedButton>
                 </div>
               )}
-            </div>
+            </motion.div>
           </div>
 
           <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-lg h-fit">
@@ -439,16 +469,15 @@ export default function Dashboard() {
                 <span className="text-slate-300">
                   Autonomous Mode
                 </span>
-                <button
+                <AnimatedButton
                   onClick={handleToggleAutoMode}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    autoMode
-                      ? 'bg-green-600 hover:bg-green-700 text-white'
-                      : 'bg-slate-600 hover:bg-slate-700 text-slate-200'
-                  }`}
+                  type="button"
+                  variant={autoMode ? 'primary' : 'secondary'}
+                  size="sm"
+                  className="min-w-20"
                 >
                   {autoMode ? 'ON' : 'OFF'}
-                </button>
+                </AnimatedButton>
               </div>
               <p className="text-sm text-slate-400">
                 {autoMode

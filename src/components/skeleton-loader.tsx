@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { motion } from 'framer-motion';
 
 export function SkeletonLoader({ className = '' }: { className?: string }) {
@@ -59,5 +60,3 @@ export function LoadingMessage({ messages }: { messages: string[] }) {
     </motion.div>
   );
 }
-
-import React from 'react';
