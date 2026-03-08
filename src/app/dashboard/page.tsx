@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Send, LogOut, Zap, Lock, CheckCircle2 } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
 import { PricingSection } from '@/components/pricing-section';
+import { AnimatedButton } from '@/components/animated-button';
+import { TweetSkeleton, LoadingMessage } from '@/components/skeleton-loader';
 
 interface UserProfile {
   id: string;
@@ -24,8 +29,6 @@ export default function Dashboard() {
   const [posting, setPosting] = useState(false);
   const [autoMode, setAutoMode] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [intentUrl, setIntentUrl] = useState<string | null>(null);
 
   const tokenLimit = user?.is_subscribed ? Infinity : (user?.token_limit ?? 10);
   const tokensUsed = user?.tokens_used ?? 0;
@@ -60,7 +63,10 @@ export default function Dashboard() {
 
   const handlePostTweet = async () => {
     if (isLocked) {
-      setMessage('Account locked. Free plan limit reached (10/10). Upgrade to Pro for unlimited tokens.');
+      toast.error('Account locked. Upgrade to Pro for unlimited tokens.', {
+        icon: '🔒',
+        duration: 4000,
+      });
       return;
     }
 
@@ -68,12 +74,14 @@ export default function Dashboard() {
     const chosenTweet = selectedOption.trim();
 
     if (!topic && !chosenTweet) {
-      setMessage('Please enter a topic and generate options first');
+      toast.error('Please enter a topic and generate options first', {
+        duration: 3000,
+      });
       return;
     }
 
+    const toastId = toast.loading('Posting your tweet...');
     setPosting(true);
-    setIntentUrl(null);
 
     try {
       const response = await fetch('/api/agent/post', {
@@ -86,6 +94,8 @@ export default function Dashboard() {
 
       const data = await response.json();
 
+      toast.dismiss(toastId);
+
       if (!response.ok) {
         if (response.status === 402 && data.code === 'TOKEN_LIMIT_REACHED') {
           setUser(prev => prev ? {
@@ -94,7 +104,11 @@ export default function Dashboard() {
             token_limit: data.tokenLimit ?? prev.token_limit,
             is_subscribed: data.isSubscribed ?? prev.is_subscribed,
           } : prev);
-          throw new Error('Free token limit reached. Upgrade to Pro for unlimited posting.');
+          toast.error('Free token limit reached. Upgrade to Pro for unlimited posting.', {
+            duration: 5000,
+            icon: '🚀',
+          });
+          return;
         }
         throw new Error(data.error || 'Failed to post tweet');
       }
@@ -107,41 +121,52 @@ export default function Dashboard() {
       } : prev);
 
       if (data.manualRequired) {
-        setIntentUrl(data.intentUrl || null);
-
         if (data.intentUrl) {
           window.open(data.intentUrl, '_blank', 'noopener,noreferrer');
         }
-
-        setMessage(`X API credits are depleted. We opened a prefilled X composer for one-click publish.\n\nTweet:\n${data.tweet}`);
+        toast.success('Tweet ready! Opening X composer for one-click publish.', {
+          icon: '✨',
+          duration: 4000,
+        });
       } else {
-        setMessage(`Tweet posted! ${data.tweet}`);
+        toast.success('Tweet posted successfully! 🎉', {
+          duration: 4000,
+        });
       }
+      
+      // Clear form
       setContext('');
       setOptions([]);
       setSelectedOption('');
     } catch (error) {
-      setMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(error instanceof Error ? error.message : 'Failed to post tweet', {
+        duration: 4000,
+      });
     } finally {
+      toast.dismiss(toastId);
       setPosting(false);
     }
   };
 
   const handleGenerateOptions = async () => {
     if (isLocked) {
-      setMessage('Account locked. Free plan limit reached (10/10). Upgrade to Pro for unlimited tokens.');
+      toast.error('Account locked. Upgrade to Pro for unlimited tokens.', {
+        icon: '🔒',
+        duration: 4000,
+      });
       return;
     }
 
     const topic = context.trim();
     if (!topic) {
-      setMessage('Please enter a topic first');
+      toast.error('Please enter a topic first', {
+        duration: 3000,
+      });
       return;
     }
 
+    const toastId = toast.loading('AI is crafting tweet options...');
     setGenerating(true);
-    setMessage('');
-    setIntentUrl(null);
 
     try {
       const response = await fetch('/api/agent/suggest', {
@@ -153,6 +178,9 @@ export default function Dashboard() {
       });
 
       const data = await response.json();
+      
+      toast.dismiss(toastId);
+      
       if (!response.ok) {
         throw new Error(data.error || 'Failed to generate tweet options');
       }
@@ -160,15 +188,23 @@ export default function Dashboard() {
       const nextOptions: string[] = Array.isArray(data.options) ? data.options : [];
       setOptions(nextOptions);
       setSelectedOption(nextOptions[0] || '');
-      setMessage(`Generated ${nextOptions.length} tweet options. Select one and click post.`);
+      
+      toast.success(`Generated ${nextOptions.length} tweet options! 🎯`, {
+        duration: 3000,
+      });
     } catch (error) {
-      setMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(error instanceof Error ? error.message : 'Failed to generate options', {
+        duration: 4000,
+      });
     } finally {
+      toast.dismiss(toastId);
       setGenerating(false);
     }
   };
 
   const handleToggleAutoMode = async () => {
+    const toastId = toast.loading(`${autoMode ? 'Disabling' : 'Enabling'} auto-mode...`);
+    
     try {
       const response = await fetch('/api/user/profile', {
         method: 'PATCH',
@@ -185,16 +221,22 @@ export default function Dashboard() {
       }
 
       setAutoMode(!autoMode);
-      setMessage(
-        `Auto-mode ${!autoMode ? 'enabled' : 'disabled'}`
-      );
+      toast.success(`Auto-mode ${!autoMode ? 'enabled' : 'disabled'} ✨`, {
+        duration: 3000,
+      });
     } catch (error) {
-      setMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(error instanceof Error ? error.message : 'Failed to toggle auto-mode', {
+        duration: 4000,
+      });
+    } finally {
+      toast.dismiss(toastId);
     }
   };
 
   const handleUpgrade = async () => {
     setUpgrading(true);
+    const toastId = toast.loading('Activating Pro plan...');
+    
     try {
       const response = await fetch('/api/user/profile', {
         method: 'PATCH',
@@ -214,10 +256,16 @@ export default function Dashboard() {
         is_subscribed: true,
         token_limit: -1,
       } : prev);
-      setMessage('Pro plan activated. You now have unlimited tokens.');
+      
+      toast.success('🎉 Pro plan activated! You now have unlimited tokens.', {
+        duration: 5000,
+      });
     } catch (error) {
-      setMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(error instanceof Error ? error.message : 'Upgrade failed', {
+        duration: 4000,
+      });
     } finally {
+      toast.dismiss(toastId);
       setUpgrading(false);
     }
   };
@@ -244,7 +292,31 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800">
+    <>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#1e293b',
+            color: '#f1f5f9',
+            border: '1px solid #334155',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#f1f5f9',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#f1f5f9',
+            },
+          },
+        }}
+      />
+      <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800">
       <nav className="bg-slate-900 border-b border-slate-700 shadow-lg">
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-white">
@@ -338,22 +410,6 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-
-            {message && (
-              <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-slate-100">
-                <p className="whitespace-pre-line">{message}</p>
-                {intentUrl && (
-                  <a
-                    href={intentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Open Prefilled X Composer
-                  </a>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-lg h-fit">
@@ -417,6 +473,7 @@ export default function Dashboard() {
           />
         </section>
       </main>
-    </div>
+      </div>
+    </>
   );
 }
