@@ -52,44 +52,76 @@ export async function exchangeCodeForToken(
   code: string,
   codeVerifier: string
 ): Promise<TwitterTokenResponse> {
+  const clientId = process.env.TWITTER_CLIENT_ID!;
+  const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: process.env.TWITTER_REDIRECT_URI!,
+    code_verifier: codeVerifier,
+  });
+
+  // Public clients send client_id in the request body.
+  if (!clientSecret) {
+    body.set('client_id', clientId);
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+
+  // Confidential clients should authenticate with HTTP Basic auth.
+  if (clientSecret) {
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    headers.Authorization = `Basic ${basic}`;
+  }
+
   const response = await fetch(TWITTER_TOKEN_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      client_id: process.env.TWITTER_CLIENT_ID!,
-      client_secret: process.env.TWITTER_CLIENT_SECRET!,
-      redirect_uri: process.env.TWITTER_REDIRECT_URI!,
-      code_verifier: codeVerifier,
-    }).toString(),
+    headers,
+    body: body.toString(),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to exchange code: ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Failed to exchange code (${response.status}): ${errorText || response.statusText}`);
   }
 
   return response.json();
 }
 
 export async function refreshAccessToken(refreshToken: string): Promise<TwitterTokenResponse> {
+  const clientId = process.env.TWITTER_CLIENT_ID!;
+  const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+  });
+
+  if (!clientSecret) {
+    body.set('client_id', clientId);
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+
+  if (clientSecret) {
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    headers.Authorization = `Basic ${basic}`;
+  }
+
   const response = await fetch(TWITTER_TOKEN_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-      client_id: process.env.TWITTER_CLIENT_ID!,
-      client_secret: process.env.TWITTER_CLIENT_SECRET!,
-    }).toString(),
+    headers,
+    body: body.toString(),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to refresh token: ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Failed to refresh token (${response.status}): ${errorText || response.statusText}`);
   }
 
   return response.json();
