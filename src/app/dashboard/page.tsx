@@ -58,15 +58,16 @@ export default function Dashboard() {
         body: JSON.stringify({ context }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to post tweet');
+        throw new Error(data.error || 'Failed to post tweet');
       }
 
-      const data = await response.json();
       setMessage(`Tweet posted! ${data.tweet}`);
       setContext('');
     } catch (error) {
-      setMessage(`Error: ${String(error)}`);
+      setMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setPosting(false);
     }
@@ -82,8 +83,10 @@ export default function Dashboard() {
         body: JSON.stringify({ auto_mode: !autoMode }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to update settings');
+        throw new Error(data.error || 'Failed to update settings');
       }
 
       setAutoMode(!autoMode);
@@ -91,7 +94,7 @@ export default function Dashboard() {
         `Auto-mode ${!autoMode ? 'enabled' : 'disabled'}`
       );
     } catch (error) {
-      setMessage(`Error: ${String(error)}`);
+      setMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
