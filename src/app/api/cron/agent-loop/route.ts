@@ -9,9 +9,9 @@ import { User } from '@/types';
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET?.trim();
-  const expectedSecret = cronSecret ? `Bearer ${cronSecret}` : '';
+  const providedSecret = authHeader?.replace(/^Bearer\s+/i, '').trim();
 
-  if (authHeader !== expectedSecret) {
+  if (!cronSecret || providedSecret !== cronSecret) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
