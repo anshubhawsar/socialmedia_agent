@@ -96,9 +96,9 @@ export function PricingSection({ onUpgrade, upgrading, isSubscribed }: PricingSe
       >
         <h3 className="text-xl font-bold text-white">Starter</h3>
         <div className="my-4 text-4xl font-black text-white">Free</div>
-        <p className="text-slate-400 mb-6">Perfect for trying us out.</p>
+        <p className="text-slate-400 mb-6">Designed for evaluation and light usage.</p>
         <ul className="space-y-3 mb-8 text-slate-200">
-          <li className="flex items-center gap-2"><Check size={18} className="text-green-400" /> 10 Free Tokens</li>
+          <li className="flex items-center gap-2"><Check size={18} className="text-green-400" /> 10 monthly tokens</li>
           <li className="flex items-center gap-2"><Check size={18} className="text-green-400" /> Basic Analytics</li>
         </ul>
         <button
@@ -131,7 +131,7 @@ export function PricingSection({ onUpgrade, upgrading, isSubscribed }: PricingSe
           disabled={upgrading || isSubscribed}
           className="w-full px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold transition-all shadow-lg shadow-sky-500/30"
         >
-          {isSubscribed ? 'Pro Active' : upgrading ? 'Processing...' : 'Upgrade Now'}
+          {isSubscribed ? 'Pro Active' : upgrading ? 'Processing...' : 'Upgrade to Pro'}
         </button>
       </motion.div>
     </div>

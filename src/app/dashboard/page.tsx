@@ -63,8 +63,7 @@ export default function Dashboard() {
 
   const handlePostTweet = async () => {
     if (isLocked) {
-      toast.error('Account locked. Upgrade to Pro for unlimited tokens.', {
-        icon: '🔒',
+      toast.error('Usage limit reached. Upgrade to Pro to continue.', {
         duration: 4000,
       });
       return;
@@ -80,7 +79,7 @@ export default function Dashboard() {
       return;
     }
 
-    const toastId = toast.loading('Posting your tweet...');
+    const toastId = toast.loading('Publishing post...');
     setPosting(true);
 
     try {
@@ -104,9 +103,8 @@ export default function Dashboard() {
             token_limit: data.tokenLimit ?? prev.token_limit,
             is_subscribed: data.isSubscribed ?? prev.is_subscribed,
           } : prev);
-          toast.error('Free token limit reached. Upgrade to Pro for unlimited posting.', {
+          toast.error('Free plan limit reached. Upgrade to Pro for unlimited posting.', {
             duration: 5000,
-            icon: '🚀',
           });
           return;
         }
@@ -124,12 +122,11 @@ export default function Dashboard() {
         if (data.intentUrl) {
           window.open(data.intentUrl, '_blank', 'noopener,noreferrer');
         }
-        toast.success('Tweet ready! Opening X composer for one-click publish.', {
-          icon: '✨',
+        toast.success('Draft opened in X Composer for review.', {
           duration: 4000,
         });
       } else {
-        toast.success('Tweet posted successfully! 🎉', {
+        toast.success('Post published successfully.', {
           duration: 4000,
         });
       }
@@ -150,8 +147,7 @@ export default function Dashboard() {
 
   const handleGenerateOptions = async () => {
     if (isLocked) {
-      toast.error('Account locked. Upgrade to Pro for unlimited tokens.', {
-        icon: '🔒',
+      toast.error('Usage limit reached. Upgrade to Pro to continue.', {
         duration: 4000,
       });
       return;
@@ -165,7 +161,7 @@ export default function Dashboard() {
       return;
     }
 
-    const toastId = toast.loading('AI is crafting tweet options...');
+    const toastId = toast.loading('Generating post options...');
     setGenerating(true);
 
     try {
@@ -189,7 +185,7 @@ export default function Dashboard() {
       setOptions(nextOptions);
       setSelectedOption(nextOptions[0] || '');
       
-      toast.success(`Generated ${nextOptions.length} tweet options! 🎯`, {
+      toast.success(`Generated ${nextOptions.length} post options.`, {
         duration: 3000,
       });
     } catch (error) {
@@ -203,7 +199,7 @@ export default function Dashboard() {
   };
 
   const handleToggleAutoMode = async () => {
-    const toastId = toast.loading(`${autoMode ? 'Disabling' : 'Enabling'} auto-mode...`);
+    const toastId = toast.loading('Updating autonomous mode setting...');
     
     try {
       const response = await fetch('/api/user/profile', {
@@ -221,7 +217,7 @@ export default function Dashboard() {
       }
 
       setAutoMode(!autoMode);
-      toast.success(`Auto-mode ${!autoMode ? 'enabled' : 'disabled'} ✨`, {
+      toast.success(`Autonomous mode ${!autoMode ? 'enabled' : 'disabled'}.`, {
         duration: 3000,
       });
     } catch (error) {
@@ -257,7 +253,7 @@ export default function Dashboard() {
         token_limit: -1,
       } : prev);
       
-      toast.success('🎉 Pro plan activated! You now have unlimited tokens.', {
+      toast.success('Pro plan activated. Unlimited tokens enabled.', {
         duration: 5000,
       });
     } catch (error) {
@@ -320,7 +316,7 @@ export default function Dashboard() {
       <nav className="bg-slate-900 border-b border-slate-700 shadow-lg">
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-white">
-            AI Twitter Agent
+            Social Media Manager
           </h1>
           <div className="flex items-center gap-4">
             <span className="text-slate-300">
@@ -356,14 +352,14 @@ export default function Dashboard() {
                   disabled={generating || posting}
                   className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
                 >
-                  {generating ? 'Generating...' : 'Generate Tweet Options'}
+                  {generating ? 'Generating...' : 'Generate Post Options'}
                 </button>
                 <button
                   onClick={handlePostTweet}
                   disabled={posting || generating || !selectedOption}
                   className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white rounded-lg font-medium transition-colors"
                 >
-                  {posting ? 'Posting...' : 'Post Selected Tweet'}
+                  {posting ? 'Publishing...' : 'Publish Selected Option'}
                 </button>
               </div>
 
@@ -405,7 +401,7 @@ export default function Dashboard() {
                     disabled={upgrading || !!user?.is_subscribed}
                     className="mt-4 px-5 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 disabled:bg-slate-600 text-white font-semibold"
                   >
-                    {upgrading ? 'Upgrading...' : user?.is_subscribed ? 'Pro Active' : 'Unlock Pro'}
+                    {upgrading ? 'Upgrading...' : user?.is_subscribed ? 'Pro Active' : 'Upgrade to Pro'}
                   </button>
                 </div>
               )}

@@ -33,13 +33,13 @@ function HomeContent() {
       <div className="max-w-2xl w-full">
         <div className="text-center mb-12">
           <h1 className="text-5xl md:text-6xl font-bold text-white mb-4">
-            AI Twitter Agent
+            Social Media Manager
           </h1>
           <p className="text-xl text-slate-300 mb-2">
-            Autonomous AI-powered tweet generation and posting
+            AI-assisted post generation and publishing workflows
           </p>
           <p className="text-slate-400">
-            Powered by Gemini, RSS feeds, and Twitter API v2
+            Powered by Groq, RSS feeds, and X API v2
           </p>
         </div>
 
@@ -50,7 +50,7 @@ function HomeContent() {
           <ul className="space-y-3 text-slate-300">
             <li className="flex items-start">
               <span className="text-blue-400 mr-3">✓</span>
-              <span>Manual tweet generation with AI context expansion</span>
+              <span>Manual post generation with AI context expansion</span>
             </li>
             <li className="flex items-start">
               <span className="text-blue-400 mr-3">✓</span>
@@ -62,7 +62,7 @@ function HomeContent() {
             </li>
             <li className="flex items-start">
               <span className="text-blue-400 mr-3">✓</span>
-              <span>OAuth 2.0 PKCE for secure Twitter integration</span>
+              <span>OAuth 2.0 PKCE for secure X integration</span>
             </li>
             <li className="flex items-start">
               <span className="text-blue-400 mr-3">✓</span>
@@ -76,7 +76,7 @@ function HomeContent() {
             onClick={handleLogin}
             className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-lg transition-colors shadow-lg"
           >
-            Login with Twitter
+            Sign in with X
           </button>
         </div>
 
@@ -93,7 +93,7 @@ function HomeContent() {
               Manual Mode
             </h3>
             <p className="text-slate-300">
-              Write context and let AI generate professional, engaging tweets on demand.
+              Provide context and generate professional post options on demand.
             </p>
           </div>
           <div className="bg-slate-700 p-6 rounded-lg border border-slate-600">
@@ -101,7 +101,7 @@ function HomeContent() {
               Autonomous Mode
             </h3>
             <p className="text-slate-300">
-              Enable cron jobs to automatically discover, synthesize, and post high-impact AI news.
+              Enable scheduled automation to discover, synthesize, and publish relevant AI news.
             </p>
           </div>
         </div>
