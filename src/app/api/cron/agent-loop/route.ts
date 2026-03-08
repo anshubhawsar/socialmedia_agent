@@ -8,7 +8,8 @@ import { User } from '@/types';
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
-  const expectedSecret = `Bearer ${process.env.CRON_SECRET}`;
+  const cronSecret = process.env.CRON_SECRET?.trim();
+  const expectedSecret = cronSecret ? `Bearer ${cronSecret}` : '';
 
   if (authHeader !== expectedSecret) {
     return NextResponse.json(
