@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { PricingSection } from '@/components/pricing-section';
 
 interface UserProfile {
   id: string;
   username: string;
   auto_mode: boolean;
+  tokens_used: number;
+  token_limit: number;
+  is_subscribed: boolean;
 }
 
 export default function Dashboard() {
@@ -19,8 +23,17 @@ export default function Dashboard() {
   const [generating, setGenerating] = useState(false);
   const [posting, setPosting] = useState(false);
   const [autoMode, setAutoMode] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
   const [message, setMessage] = useState('');
   const [intentUrl, setIntentUrl] = useState<string | null>(null);
+
+  const tokenLimit = user?.is_subscribed ? Infinity : (user?.token_limit ?? 10);
+  const tokensUsed = user?.tokens_used ?? 0;
+  const tokensRemaining = user?.is_subscribed ? Infinity : Math.max(0, tokenLimit - tokensUsed);
+  const usagePercent = user?.is_subscribed || tokenLimit === Infinity
+    ? 0
+    : Math.min(100, Math.round((tokensUsed / tokenLimit) * 100));
+  const isLocked = !user?.is_subscribed && tokenLimit !== Infinity && tokensUsed >= tokenLimit;
 
   useEffect(() => {
     fetchUserProfile();
@@ -46,6 +59,11 @@ export default function Dashboard() {
   };
 
   const handlePostTweet = async () => {
+    if (isLocked) {
+      setMessage('Account locked. Free plan limit reached (10/10). Upgrade to Pro for unlimited tokens.');
+      return;
+    }
+
     const topic = context.trim();
     const chosenTweet = selectedOption.trim();
 
@@ -69,8 +87,24 @@ export default function Dashboard() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (response.status === 402 && data.code === 'TOKEN_LIMIT_REACHED') {
+          setUser(prev => prev ? {
+            ...prev,
+            tokens_used: data.tokensUsed ?? prev.tokens_used,
+            token_limit: data.tokenLimit ?? prev.token_limit,
+            is_subscribed: data.isSubscribed ?? prev.is_subscribed,
+          } : prev);
+          throw new Error('Free token limit reached. Upgrade to Pro for unlimited posting.');
+        }
         throw new Error(data.error || 'Failed to post tweet');
       }
+
+      setUser(prev => prev ? {
+        ...prev,
+        tokens_used: data.tokensUsed ?? prev.tokens_used,
+        token_limit: data.tokenLimit ?? prev.token_limit,
+        is_subscribed: data.isSubscribed ?? prev.is_subscribed,
+      } : prev);
 
       if (data.manualRequired) {
         setIntentUrl(data.intentUrl || null);
@@ -94,6 +128,11 @@ export default function Dashboard() {
   };
 
   const handleGenerateOptions = async () => {
+    if (isLocked) {
+      setMessage('Account locked. Free plan limit reached (10/10). Upgrade to Pro for unlimited tokens.');
+      return;
+    }
+
     const topic = context.trim();
     if (!topic) {
       setMessage('Please enter a topic first');
@@ -154,6 +193,35 @@ export default function Dashboard() {
     }
   };
 
+  const handleUpgrade = async () => {
+    setUpgrading(true);
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_subscribed: true }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Upgrade failed');
+      }
+
+      setUser(prev => prev ? {
+        ...prev,
+        is_subscribed: true,
+        token_limit: -1,
+      } : prev);
+      setMessage('Pro plan activated. You now have unlimited tokens.');
+    } catch (error) {
+      setMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
   const handleLogout = () => {
     document.cookie = 'userId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
     router.push('/');
@@ -199,7 +267,7 @@ export default function Dashboard() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-lg">
+            <div className="relative bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-lg overflow-hidden">
               <h2 className="text-xl font-bold text-white mb-4">
                 Topic To Tweet Options
               </h2>
@@ -252,6 +320,23 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
+
+              {isLocked && (
+                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center z-10">
+                  <p className="text-white text-lg font-semibold">Free Plan Limit Reached</p>
+                  <p className="text-slate-300 mt-2 max-w-md">
+                    You used all 10 free tokens. Upgrade to Pro to unlock unlimited tweet generation and posting.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleUpgrade}
+                    disabled={upgrading || !!user?.is_subscribed}
+                    className="mt-4 px-5 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 disabled:bg-slate-600 text-white font-semibold"
+                  >
+                    {upgrading ? 'Upgrading...' : user?.is_subscribed ? 'Pro Active' : 'Unlock Pro'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {message && (
@@ -276,6 +361,28 @@ export default function Dashboard() {
               Settings
             </h2>
             <div className="space-y-4">
+              <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-slate-300">Token Usage</span>
+                  <span className="text-white font-semibold">
+                    {user.is_subscribed ? 'Unlimited' : `${tokensUsed}/10`}
+                  </span>
+                </div>
+                {!user.is_subscribed && (
+                  <div className="h-2 w-full rounded-full bg-slate-700 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 shadow-[0_0_14px_rgba(59,130,246,0.7)]"
+                      style={{ width: `${usagePercent}%` }}
+                    />
+                  </div>
+                )}
+                <p className="text-xs text-slate-400 mt-2">
+                  {user.is_subscribed
+                    ? 'Pro plan active. Unlimited posting enabled.'
+                    : `${tokensRemaining} free token${tokensRemaining === 1 ? '' : 's'} remaining.`}
+                </p>
+              </div>
+
               <div className="flex items-center justify-between">
                 <span className="text-slate-300">
                   Autonomous Mode
@@ -299,6 +406,16 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        <section className="mt-10">
+          <h2 className="text-2xl font-bold text-white text-center mb-4">Choose Your Plan</h2>
+          <p className="text-slate-400 text-center mb-6">Starter includes 10 tokens. Pro unlocks unlimited generation and posting.</p>
+          <PricingSection
+            onUpgrade={handleUpgrade}
+            upgrading={upgrading}
+            isSubscribed={!!user?.is_subscribed}
+          />
+        </section>
       </main>
     </div>
   );

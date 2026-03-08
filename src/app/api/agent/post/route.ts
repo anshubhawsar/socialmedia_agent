@@ -5,6 +5,12 @@ import { postTweet } from '@/lib/twitter';
 import { ensureValidAccessToken } from '@/lib/auth';
 import { TweetRequest } from '@/types';
 
+type ProfileRecord = {
+  tokens_used: number;
+  token_limit: number;
+  is_subscribed: boolean;
+};
+
 export async function POST(request: NextRequest) {
   const body: TweetRequest = await request.json();
   const context = typeof body.context === 'string' ? body.context.trim() : '';
@@ -20,6 +26,9 @@ export async function POST(request: NextRequest) {
 
   try {
     let accessToken: string;
+    let isSubscribed = false;
+    let tokensUsed = 0;
+    let tokenLimit = 10;
     
     if (!supabase) {
       // Cookie-based session
@@ -31,6 +40,11 @@ export async function POST(request: NextRequest) {
         );
       }
       accessToken = cookieToken;
+
+      const rawTokensUsed = request.cookies.get('tokens_used')?.value;
+      tokensUsed = Number.parseInt(rawTokensUsed || '0', 10) || 0;
+      isSubscribed = request.cookies.get('is_subscribed')?.value === 'true';
+      tokenLimit = isSubscribed ? Number.MAX_SAFE_INTEGER : 10;
     } else {
       // Database session
       const { data: user, error: userError } = await supabase
@@ -47,6 +61,31 @@ export async function POST(request: NextRequest) {
       }
 
       accessToken = await ensureValidAccessToken(user);
+
+      const { data: profile, error: profileError } = await supabase
+        .rpc('refresh_profile_tokens_if_due', { p_user_id: userId })
+        .single<ProfileRecord>();
+
+      if (profileError) {
+        throw new Error(`Profile lookup failed: ${profileError.message}`);
+      }
+
+      isSubscribed = profile?.is_subscribed ?? false;
+      tokensUsed = profile?.tokens_used ?? 0;
+      tokenLimit = isSubscribed ? Number.MAX_SAFE_INTEGER : (profile?.token_limit ?? 10);
+    }
+
+    if (!isSubscribed && tokensUsed >= tokenLimit) {
+      return NextResponse.json(
+        {
+          error: 'Token limit reached. Upgrade to Pro for unlimited posting.',
+          code: 'TOKEN_LIMIT_REACHED',
+          tokensUsed,
+          tokenLimit,
+          isSubscribed,
+        },
+        { status: 402 }
+      );
     }
 
     const tweet = selectedTweet || await generateTweet(context);
@@ -60,14 +99,34 @@ export async function POST(request: NextRequest) {
 
       if (isCreditError) {
         const intentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(tweet)}`;
-        return NextResponse.json({
+        const response = NextResponse.json({
           success: false,
           manualRequired: true,
           tweet,
           intentUrl,
           error: 'Twitter credits depleted. Copy this tweet and post manually from your X account.',
           details: message,
+          tokensUsed: isSubscribed ? tokensUsed : tokensUsed + 1,
+          tokenLimit: isSubscribed ? -1 : tokenLimit,
+          isSubscribed,
         });
+
+        if (!isSubscribed) {
+          if (supabase) {
+            await supabase
+              .from('profiles')
+              .update({ tokens_used: tokensUsed + 1 })
+              .eq('user_id', userId);
+          } else {
+            response.cookies.set('tokens_used', String(tokensUsed + 1), {
+              httpOnly: true,
+              maxAge: 86400 * 365,
+              path: '/',
+            });
+          }
+        }
+
+        return response;
       }
 
       throw postError;
@@ -88,7 +147,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, tweet, tweetId });
+    const response = NextResponse.json({
+      success: true,
+      tweet,
+      tweetId,
+      tokensUsed: isSubscribed ? tokensUsed : tokensUsed + 1,
+      tokenLimit: isSubscribed ? -1 : tokenLimit,
+      isSubscribed,
+    });
+
+    if (!isSubscribed) {
+      if (supabase) {
+        await supabase
+          .from('profiles')
+          .update({ tokens_used: tokensUsed + 1 })
+          .eq('user_id', userId);
+      } else {
+        response.cookies.set('tokens_used', String(tokensUsed + 1), {
+          httpOnly: true,
+          maxAge: 86400 * 365,
+          path: '/',
+        });
+      }
+    }
+
+    return response;
   } catch (error) {
     console.error('Tweet error:', error);
     return NextResponse.json(

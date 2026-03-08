@@ -50,6 +50,14 @@ export async function GET(request: NextRequest) {
 
         if (error) throw error;
         userId = existingUser.id;
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            user_id: userId,
+          }, { onConflict: 'user_id' });
+
+        if (profileError) throw profileError;
       } else {
         const { data: newUser, error } = await supabase
           .from('users')
@@ -65,6 +73,17 @@ export async function GET(request: NextRequest) {
 
         if (error || !newUser) throw error;
         userId = newUser.id;
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: userId,
+            tokens_used: 0,
+            token_limit: 10,
+            is_subscribed: false,
+          });
+
+        if (profileError) throw profileError;
       }
     } else {
       // Supabase not configured - use Twitter ID as userId

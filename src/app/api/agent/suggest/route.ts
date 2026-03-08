@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     if (normalized.includes('quota') || normalized.includes('429')) {
       return NextResponse.json(
         {
-          error: 'Gemini quota exceeded. Enable billing or use a key/project with available quota, then retry.',
+          error: 'AI provider quota exceeded. Please retry shortly or upgrade API capacity.',
           details: message,
         },
         { status: 429 }
