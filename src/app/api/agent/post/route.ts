@@ -49,7 +49,26 @@ export async function POST(request: NextRequest) {
     }
 
     const tweet = await generateTweet(context);
-    const tweetId = await postTweet(accessToken, tweet);
+
+    let tweetId: string | null = null;
+    try {
+      tweetId = await postTweet(accessToken, tweet);
+    } catch (postError) {
+      const message = postError instanceof Error ? postError.message : String(postError);
+      const isCreditError = message.includes('CreditsDepleted') || message.includes('Twitter API Error (402)');
+
+      if (isCreditError) {
+        return NextResponse.json({
+          success: false,
+          manualRequired: true,
+          tweet,
+          error: 'Twitter credits depleted. Copy this tweet and post manually from your X account.',
+          details: message,
+        });
+      }
+
+      throw postError;
+    }
 
     if (supabase) {
       const { error: logError } = await supabase
@@ -66,9 +85,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      { success: true, tweet, tweetId }
-    );
+    return NextResponse.json({ success: true, tweet, tweetId });
   } catch (error) {
     console.error('Tweet error:', error);
     return NextResponse.json(

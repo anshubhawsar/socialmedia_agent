@@ -64,7 +64,11 @@ export default function Dashboard() {
         throw new Error(data.error || 'Failed to post tweet');
       }
 
-      setMessage(`Tweet posted! ${data.tweet}`);
+      if (data.manualRequired) {
+        setMessage(`Manual post required: ${data.error}\n\nTweet:\n${data.tweet}`);
+      } else {
+        setMessage(`Tweet posted! ${data.tweet}`);
+      }
       setContext('');
     } catch (error) {
       setMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
