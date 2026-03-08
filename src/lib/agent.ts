@@ -14,6 +14,20 @@ const DEFAULT_GEMINI_MODELS = [
   'gemini-pro',
 ];
 
+function buildDeterministicTweet(input: string): string {
+  const cleaned = input
+    .replace(/\s+/g, ' ')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+
+  const maxBodyLength = 235;
+  const body = cleaned.length > maxBodyLength
+    ? `${cleaned.slice(0, maxBodyLength - 1).trim()}…`
+    : cleaned;
+
+  return `${body} #AI`;
+}
+
 function getModelCandidates(): string[] {
   const configured = process.env.GEMINI_MODEL?.trim();
   if (!configured) return DEFAULT_GEMINI_MODELS;
@@ -53,8 +67,13 @@ Context: ${context}
 
 Generate only the tweet text, with no additional explanation.`;
 
-  const { text } = await generateWithFallback(prompt);
-  return text.trim();
+  try {
+    const { text } = await generateWithFallback(prompt);
+    return text.trim();
+  } catch {
+    // Graceful degradation for quota/model outages.
+    return buildDeterministicTweet(context);
+  }
 }
 
 export async function selectBestHeadline(headlines: string[]): Promise<{ index: number; synthesis: string }> {
@@ -77,7 +96,16 @@ Requirements:
 - Use minimal hashtags (max 1-2) and no emojis
 - Be suitable for an AI/tech audience`;
 
-  const { text } = await generateWithFallback(prompt);
+  let text: string;
+  try {
+    ({ text } = await generateWithFallback(prompt));
+  } catch {
+    const fallbackIndex = 0;
+    return {
+      index: fallbackIndex,
+      synthesis: buildDeterministicTweet(headlines[fallbackIndex]),
+    };
+  }
 
   const lines = text.split('\n');
   const selectedLine = lines.find(line => line.startsWith('SELECTED:'));
