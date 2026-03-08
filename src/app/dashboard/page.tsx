@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [posting, setPosting] = useState(false);
   const [autoMode, setAutoMode] = useState(false);
   const [message, setMessage] = useState('');
+  const [intentUrl, setIntentUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUserProfile();
@@ -48,6 +49,7 @@ export default function Dashboard() {
     }
 
     setPosting(true);
+    setIntentUrl(null);
 
     try {
       const response = await fetch('/api/agent/post', {
@@ -65,7 +67,13 @@ export default function Dashboard() {
       }
 
       if (data.manualRequired) {
-        setMessage(`Manual post required: ${data.error}\n\nTweet:\n${data.tweet}`);
+        setIntentUrl(data.intentUrl || null);
+
+        if (data.intentUrl) {
+          window.open(data.intentUrl, '_blank', 'noopener,noreferrer');
+        }
+
+        setMessage(`X API credits are depleted. We opened a prefilled X composer for one-click publish.\n\nTweet:\n${data.tweet}`);
       } else {
         setMessage(`Tweet posted! ${data.tweet}`);
       }
@@ -168,7 +176,17 @@ export default function Dashboard() {
 
             {message && (
               <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 text-slate-100">
-                {message}
+                <p className="whitespace-pre-line">{message}</p>
+                {intentUrl && (
+                  <a
+                    href={intentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Open Prefilled X Composer
+                  </a>
+                )}
               </div>
             )}
           </div>

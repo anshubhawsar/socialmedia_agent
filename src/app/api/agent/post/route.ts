@@ -58,10 +58,12 @@ export async function POST(request: NextRequest) {
       const isCreditError = message.includes('CreditsDepleted') || message.includes('Twitter API Error (402)');
 
       if (isCreditError) {
+        const intentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(tweet)}`;
         return NextResponse.json({
           success: false,
           manualRequired: true,
           tweet,
+          intentUrl,
           error: 'Twitter credits depleted. Copy this tweet and post manually from your X account.',
           details: message,
         });
