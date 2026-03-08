@@ -1,21 +1,15 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error('GEMINI_API_KEY environment variable is required');
+if (!process.env.GROQ_API_KEY) {
+  throw new Error('GROQ_API_KEY environment variable is required');
 }
 
-const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-const DEFAULT_GEMINI_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash-8b',
-  'gemini-1.5-flash-latest',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro-latest',
-  'gemini-1.5-pro',
-  'gemini-1.0-pro',
-  'gemini-pro',
+const DEFAULT_GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'mixtral-8x7b-32768',
+  'gemma2-9b-it',
 ];
 
 const ENABLE_NON_AI_FALLBACK = process.env.ENABLE_NON_AI_FALLBACK === 'true';
@@ -49,29 +43,25 @@ function normalizeTweetOption(option: string): string {
 }
 
 function getModelCandidates(): string[] {
-  const configured = process.env.GEMINI_MODEL?.trim();
-  if (!configured) return DEFAULT_GEMINI_MODELS;
+  const configured = process.env.GROQ_MODEL?.trim();
+  if (!configured) return DEFAULT_GROQ_MODELS;
 
   // Try user-configured model first, then fall back to known compatible models.
-  return [configured, ...DEFAULT_GEMINI_MODELS.filter(m => m !== configured)];
+  return [configured, ...DEFAULT_GROQ_MODELS.filter(m => m !== configured)];
 }
 
-async function generateWithFallback(prompt: string): Promise<{ text: string; model: string }> {
+async function generateWithGroq(prompt: string): Promise<{ text: string; model: string }> {
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const parseRetryDelayMs = (message: string): number => {
-    const secMatch = message.match(/Please retry in\s+([\d.]+)s/i);
+    const secMatch = message.match(/retry.*?in\s+([\d.]+)\s*s/i);
     if (!secMatch) return 0;
     const seconds = Number(secMatch[1]);
     return Number.isFinite(seconds) ? Math.max(0, Math.ceil(seconds * 1000)) : 0;
   };
 
-  const isRetryableQuotaError = (message: string): boolean => {
-    const normalized = message.toLowerCase();
-    return normalized.includes('429')
-      || normalized.includes('quota exceeded')
-      || normalized.includes('resource_exhausted')
-      || normalized.includes('too many requests');
+  const isRetryableError = (statusCode: number): boolean => {
+    return statusCode === 429 || statusCode === 503;
   };
 
   const models = getModelCandidates();
@@ -80,19 +70,42 @@ async function generateWithFallback(prompt: string): Promise<{ text: string; mod
   for (const modelName of models) {
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        const model = gemini.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
-        return { text: result.response.text().trim(), model: modelName };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        const retryDelayMs = parseRetryDelayMs(message);
-        const retryable = isRetryableQuotaError(message) && attempt < 2;
+        const response = await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 500,
+            temperature: 0.7,
+          }),
+        });
 
-        if (retryable) {
+        if (response.ok) {
+          const data = await response.json();
+          const text = data.choices?.[0]?.message?.content || '';
+          if (text) {
+            return { text: text.trim(), model: modelName };
+          }
+          throw new Error('No content in response');
+        }
+
+        const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
+        const message = errorData.error?.message || response.statusText;
+        
+        if (isRetryableError(response.status) && attempt < 2) {
+          const retryDelayMs = parseRetryDelayMs(message);
           await sleep(retryDelayMs || 1200);
           continue;
         }
 
+        errors.push(`${modelName} (${response.status}): ${message}`);
+        break;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         errors.push(`${modelName}: ${message}`);
         break;
       }
@@ -100,7 +113,7 @@ async function generateWithFallback(prompt: string): Promise<{ text: string; mod
   }
 
   throw new Error(
-    `Gemini generation failed for all candidate models. ${
+    `Groq generation failed for all candidate models. ${
       errors.length ? `Details: ${errors.join(' | ')}` : ''
     }`
   );
@@ -120,7 +133,7 @@ Context: ${context}
 Generate only the tweet text, with no additional explanation.`;
 
   try {
-    const { text } = await generateWithFallback(prompt);
+    const { text } = await generateWithGroq(prompt);
     return text.trim();
   } catch (error) {
     if (!ENABLE_NON_AI_FALLBACK) {
@@ -144,7 +157,7 @@ Rules:
 - Return plain text only, one tweet per line, no numbering`;
 
   try {
-    const { text } = await generateWithFallback(prompt);
+    const { text } = await generateWithGroq(prompt);
     const lines = text
       .split('\n')
       .map(normalizeTweetOption)
@@ -187,7 +200,7 @@ Requirements:
 
   let text: string;
   try {
-    ({ text } = await generateWithFallback(prompt));
+    ({ text } = await generateWithGroq(prompt));
   } catch (error) {
     if (!ENABLE_NON_AI_FALLBACK) {
       throw error;
@@ -204,14 +217,14 @@ Requirements:
   const tweetLine = lines.find(line => line.startsWith('TWEET:'));
 
   if (!selectedLine || !tweetLine) {
-    throw new Error('Failed to parse Gemini response');
+    throw new Error('Failed to parse AI response');
   }
 
   const selectedMatch = selectedLine.match(/SELECTED:\s*(\d+)/);
   const tweetMatch = tweetLine.match(/TWEET:\s*(.*)/);
 
   if (!selectedMatch || !tweetMatch) {
-    throw new Error('Invalid Gemini response format');
+    throw new Error('Invalid AI response format');
   }
 
   const selectedIndex = parseInt(selectedMatch[1]) - 1;
