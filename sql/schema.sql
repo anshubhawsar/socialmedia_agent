@@ -45,6 +45,13 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tweets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (for idempotent execution)
+DROP POLICY IF EXISTS "Users can read their own data" ON users;
+DROP POLICY IF EXISTS "Users can update their own data" ON users;
+DROP POLICY IF EXISTS "Users can read their own tweets" ON tweets;
+DROP POLICY IF EXISTS "Users can read their own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
+
 -- Create policies for RLS
 CREATE POLICY "Users can read their own data" ON users
   FOR SELECT USING (auth.uid()::text = id::text);
