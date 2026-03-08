@@ -7,7 +7,7 @@ if (!process.env.GEMINI_API_KEY) {
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export async function generateTweet(context: string): Promise<string> {
-  const model = gemini.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
 
   const prompt = `You are a top-tier AI researcher and expert communicator. Based on the given context, synthesize a concise, factual, and engaging tweet (280 characters max). 
 
@@ -27,7 +27,7 @@ Generate only the tweet text, with no additional explanation.`;
 }
 
 export async function selectBestHeadline(headlines: string[]): Promise<{ index: number; synthesis: string }> {
-  const model = gemini.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
 
   const headlinesList = headlines
     .map((h, i) => `${i + 1}. ${h}`)
